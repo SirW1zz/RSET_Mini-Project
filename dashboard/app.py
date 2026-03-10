@@ -187,15 +187,20 @@ elif role == "Teacher":
     st.title("Teacher Dashboard 👨‍🏫")
     st.markdown("Automated attendance snapshot system.")
     
-    if 'session_active' not in st.session_state:
-        st.session_state['session_active'] = False
-        st.session_state['teacher_name'] = ""
-        st.session_state['teacher_subject'] = ""
-        st.session_state['present_students'] = []
-        st.session_state['last_scan_time'] = time.time()
-        st.session_state['auto_scan_enabled'] = False
-        st.session_state['detected_faces'] = []
-        st.session_state['frame_shape'] = (1080, 1920)
+    # INITIALIZE SESSION STATE KEYS INDIVIDUALLY
+    keys = {
+        'session_active': False,
+        'teacher_name': "",
+        'teacher_subject': "",
+        'present_students': [],
+        'last_scan_time': time.time(),
+        'auto_scan_enabled': False,
+        'detected_faces': [],
+        'frame_shape': (720, 1280) # Default common webcam res
+    }
+    for key, val in keys.items():
+        if key not in st.session_state:
+            st.session_state[key] = val
 
     # ADD CONTROLS TO SIDEBAR FOR TEACHER
     st.sidebar.subheader("Session Controls")
@@ -232,7 +237,9 @@ elif role == "Teacher":
                         st.warning("Database disconnected.")
                 else:
                     st.error("No face detected in the frame. Please make sure your face is visible and well-lit.")
-    else:
+    
+    # RENDER ACTIVE SESSION UI ONLY IF FULLY AUTHENTICATED
+    if st.session_state['session_active'] and st.session_state['teacher_name']:
         st.success(f"🟢 Active Session: **{st.session_state['teacher_subject']}** | Teacher: **{st.session_state['teacher_name']}**")
         
         student_photo = st.camera_input("Scan Classroom Focus", key="student_cam")
