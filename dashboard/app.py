@@ -258,9 +258,10 @@ elif role == "Teacher":
         if student_photo is not None:
             # We only run the heavy Quadrant Scan if it hasn't been done for this photo yet OR if interval scan triggered it
             should_run = False
-            if 'last_photo_id' not in st.session_state or st.session_state['last_photo_id'] != student_photo.id:
+            current_photo_id = f"{student_photo.name}_{student_photo.size}"
+            if 'last_photo_id' not in st.session_state or st.session_state['last_photo_id'] != current_photo_id:
                 should_run = True
-                st.session_state['last_photo_id'] = student_photo.id
+                st.session_state['last_photo_id'] = current_photo_id
             
             # Forced trigger by Interval
             if st.session_state.get('last_scan_time') == time.time():
