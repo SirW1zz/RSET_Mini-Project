@@ -5,6 +5,9 @@ import os
 import plotly.express as px
 from dotenv import load_dotenv
 from supabase import create_client, Client
+import insightface
+from insightface.app import FaceAnalysis
+import cv2
 
 # ==========================================
 # CONFIGURATION & INITIALIZATION
@@ -21,6 +24,14 @@ def init_connection() -> Client:
         return None
 
 supabase = init_connection()
+
+@st.cache_resource
+def load_face_model():
+    app = FaceAnalysis(name='buffalo_l')
+    app.prepare(ctx_id=0, det_size=(640, 640))
+    return app
+
+face_app = load_face_model()
 
 st.set_page_config(page_title="AAPT Dashboard", layout="wide", page_icon="🏫")
 
@@ -80,12 +91,35 @@ if role == "Admin":
         with st.form("enroll_form"):
             student_name = st.text_input("Full Name")
             student_role = st.selectbox("Role", ["Student", "Teacher"])
+            teacher_subject = st.text_input("Subject (Only for Teachers)")
             uploaded_file = st.file_uploader("Upload Identity Photo (Clear Face)", type=['png', 'jpg', 'jpeg'])
             
             if st.form_submit_button("Extract & Enroll"):
                 if uploaded_file and student_name:
-                    st.info(f"Extracting 512D Embeddings from image for {student_name}...")
-                    st.success("Successfully enrolled and updated pgvector in Supabase.")
+                    if student_role == "Teacher" and not teacher_subject:
+                        st.warning("Please enter a subject for the Teacher.")
+                    else:
+                        st.info(f"Extracting 512D Embeddings from image for {student_name}...")
+                        import io
+                        # Read file bytes to cv2 image
+                        file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+                        img = cv2.imdecode(file_bytes, 1)
+                        faces = face_app.get(img)
+                        if len(faces) == 0:
+                            st.error("No face detected! Please upload a clearer photo.")
+                        else:
+                            emb = faces[0].embedding.tolist()
+                            if supabase:
+                                try:
+                                    if student_role == "Teacher":
+                                        supabase.table("teachers").insert({"name": student_name, "department": teacher_subject, "subject": teacher_subject, "facial_embedding": emb}).execute()
+                                    else:
+                                        supabase.table("students").insert({"name": student_name, "facial_embedding": emb}).execute()
+                                    st.success("Successfully enrolled and updated in Supabase.")
+                                except Exception as e:
+                                    st.error(f"Database error: {e}")
+                            else:
+                                st.warning("Supabase not connected. Extraction complete but not saved.")
                 else:
                     st.warning("Please fill all fields and upload a valid image.")
                     
@@ -140,7 +174,16 @@ elif role == "Student/Parent":
     st.title("Student & Parent Portal 🎓")
     st.markdown("Track absolute persistence and overall health of class attendance.")
     
-    st.subheader("Personal Presence-over-Time Analytics")
+    # FETCH STUDENTS
+    student_list = [{"id": "dummy1", "name": "Dummy Student A"}, {"id": "dummy2", "name": "Dummy Student B"}]
+    if supabase:
+        res = supabase.table("students").select("id, name").execute()
+        if res.data:
+            student_list = res.data
+    
+    selected_student_name = st.selectbox("Select Student Profile", [s['name'] for s in student_list])
+    
+    st.subheader(f"Personal Presence-over-Time: {selected_student_name}")
     # Generate mock 30-day analytics
     np.random.seed(42)
     dates = pd.date_range(end=pd.Timestamp.today(), periods=30)
