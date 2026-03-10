@@ -226,7 +226,7 @@ elif role == "Teacher":
                     zoomed = cv2.resize(quad_frame, (w, h))
                     
                     zoomed_rgb = cv2.cvtColor(zoomed, cv2.COLOR_BGR2RGB)
-                    scan_placeholder.image(zoomed_rgb, caption=f"Processing {name}", use_column_width=True)
+                    scan_placeholder.image(zoomed_rgb, caption=f"Processing {name}", use_container_width=True)
                     time.sleep(1) # Simulation delay for presentation effect
                     
                     faces = face_app.get(zoomed)
@@ -235,7 +235,7 @@ elif role == "Teacher":
                 # 2. Main Full-Frame Context Scan
                 status_text.info("🔍 Finalizing with Full-Frame Global Sweep...")
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                scan_placeholder.image(frame_rgb, caption="Full Classroom Sweep", use_column_width=True)
+                scan_placeholder.image(frame_rgb, caption="Full Classroom Sweep", use_container_width=True)
                 time.sleep(0.5)
                 full_faces = face_app.get(frame)
                 all_faces_found.extend(full_faces)
