@@ -8,6 +8,7 @@ from supabase import create_client, Client
 import insightface
 from insightface.app import FaceAnalysis
 import cv2
+import time
 
 def match_face(face_emb, db_embeddings, threshold=0.5):
     best_match = None
@@ -200,11 +201,47 @@ elif role == "Teacher":
         student_photo = st.camera_input("Scan Classroom Focus", key="student_cam")
         
         if student_photo is not None:
-            with st.spinner("Executing 512D spatial scan on classroom..."):
+            with st.spinner("Executing 4-Quadrant 512D spatial scan on classroom..."):
                 bytes_data = student_photo.getvalue()
                 frame = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
                 
-                faces = face_app.get(frame)
+                h, w, _ = frame.shape
+                
+                scan_placeholder = st.empty()
+                status_text = st.empty()
+                
+                quadrants = [
+                    ("Zone A (Top Left)", 0, h//2, 0, w//2),
+                    ("Zone B (Top Right)", 0, h//2, w//2, w),
+                    ("Zone C (Bottom Left)", h//2, h, 0, w//2),
+                    ("Zone D (Bottom Right)", h//2, h, w//2, w)
+                ]
+                
+                all_faces_found = []
+                
+                # 1. Quadrant Scan
+                for name, y1, y2, x1, x2 in quadrants:
+                    status_text.info(f"🔍 Quadrant Algorithm: Digitally Zooming into {name}...")
+                    quad_frame = frame[y1:y2, x1:x2]
+                    zoomed = cv2.resize(quad_frame, (w, h))
+                    
+                    zoomed_rgb = cv2.cvtColor(zoomed, cv2.COLOR_BGR2RGB)
+                    scan_placeholder.image(zoomed_rgb, caption=f"Processing {name}", use_column_width=True)
+                    time.sleep(1) # Simulation delay for presentation effect
+                    
+                    faces = face_app.get(zoomed)
+                    all_faces_found.extend(faces)
+                    
+                # 2. Main Full-Frame Context Scan
+                status_text.info("🔍 Finalizing with Full-Frame Global Sweep...")
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                scan_placeholder.image(frame_rgb, caption="Full Classroom Sweep", use_column_width=True)
+                time.sleep(0.5)
+                full_faces = face_app.get(frame)
+                all_faces_found.extend(full_faces)
+                
+                status_text.empty()
+                
                 if supabase:
                     res = supabase.table("students").select("id, name, facial_embedding").execute()
                     students_db = []
@@ -213,13 +250,13 @@ elif role == "Teacher":
                             students_db.append({"id": r["id"], "name": r["name"], "embedding": np.array(r["facial_embedding"])})
                     
                     present = []
-                    for face in faces:
+                    for face in all_faces_found:
                         match, sim = match_face(face.embedding, students_db)
                         if match and match['name'] not in present:
                             present.append(match['name'])
                             
                     st.session_state['present_students'] = present
-                    st.success(f"Scan complete! Found {len(present)} students.")
+                    st.success(f"Multi-Zone Scan complete! Found {len(present)} students.")
                 else:
                     st.warning("Database disconnected.")
 
